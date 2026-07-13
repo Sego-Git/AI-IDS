@@ -6,7 +6,7 @@ from pathlib import Path
 
 from src.features import lines_to_features
 from src.train import train_from_csv
-
+from src.inference import load_model, predict_lines
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
@@ -15,6 +15,9 @@ SUSPICIOUS_KEYWORDS = ["attack", "suspicious", "failed password"]
 #Add the background training helper
 
 TRAINING_STATUS = {"running": False, "message": ""}
+
+def model_ready():
+    return MODEL_PATH.exists()
 
 def _run_training_thread(features_csv: str):
     try:
@@ -58,18 +61,25 @@ def index():
             else:
                 TRAINING_STATUS["message"] = "training already running"
 
-            results = []
-            for line in lines:
-                suspicious = any(keyword in line.lower() for keyword in SUSPICIOUS_KEYWORDS)
-                results.append({"line": line, "suspicious": suspicious})
-
+            if model_ready():
+                model = load_model()
+                results = predict_lines(model, lines)
+                for item in results:
+                    # inference returns 'anomaly' (boolean); map it to 'suspicious' for the template
+                    item["suspicious"] = item.get("anomaly", False)
+            else:
+                results = []
+                for line in lines:
+                    suspicious = any(keyword in line.lower()  for keyword in SUSPICIOUS_KEYWORDS)
+                    results.append({"line": line, "suspicious":suspicious})
+                    
             suspicious_count = sum(1 for item in results if item["suspicious"])
-
+            
             return render_template(
                 "index.html",
-                suspicious_count=suspicious_count,
-                results=results,
-                train_status=TRAINING_STATUS,
+                suspicious_count = suspicious_count,
+                results = results,
+                train_status = TRAINING_STATUS,
                 model_ready = model_ready(),
                 uploaded_filename = filename,
             )
@@ -89,8 +99,6 @@ def index():
 def train_status():
     return TRAINING_STATUS
 
-def model_ready():
-    return MODEL_PATH.exists()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)
