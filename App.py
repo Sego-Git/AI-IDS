@@ -10,6 +10,7 @@ from src.train import train_from_csv
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
+MODEL_PATH = Path("models") / "isolation_forest.joblib"
 SUSPICIOUS_KEYWORDS = ["attack", "suspicious", "failed password"]
 #Add the background training helper
 
@@ -69,6 +70,8 @@ def index():
                 suspicious_count=suspicious_count,
                 results=results,
                 train_status=TRAINING_STATUS,
+                model_ready = model_ready(),
+                uploaded_filename = filename,
             )
 
     # GET request: just show the form with no results
@@ -77,12 +80,17 @@ def index():
         suspicious_count=0,
         results=[],
         train_status=TRAINING_STATUS,
+        model_ready = model_ready(),
+        uploaded_filename = None,
     )
 
 
 @app.route("/train_status")
 def train_status():
     return TRAINING_STATUS
+
+def model_ready():
+    return MODEL_PATH.exists()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)

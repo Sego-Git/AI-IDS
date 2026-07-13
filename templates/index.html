@@ -76,15 +76,37 @@
             <button type="submit">Analyze</button>
         </form>
 
+        
+
+
+
+            <p><strong>Training status:</strong> {{ train_status.message }}</p>
+        <p><strong>Model ready:</strong> {{ "Yes" if model_ready else "No" }}</p>
+
+        {% if uploaded_filename %}
+            <p><strong>Uploaded file:</strong> {{ uploaded_filename }}</p>
+        {% endif %}
+
         <p>Suspicious events: {{ suspicious_count }}</p>
 
-        <ul>
-            {% for item in results %}
-                <li class="result {% if item.suspicious %}danger{% else %}safe{% endif %}">
-                    {{ item.line }}
-                </li>
-            {% endfor %}
-        </ul>
-    </div>
+
+
+
+                {% if results %}
+            <ul>
+                {% for item in results %}
+                    <li class="result {% if item.suspicious %}danger{% else %}safe{% endif %}">
+                        {{ item.line }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No analysis results yet. Upload a log file above to analyze.</p>
+        {% endif %}
+
+                {% if results %}
+            <h2>Analysis results</h2>
+            <ul> ... </ul>
+        {% endif %}
 </body>
 </html>
