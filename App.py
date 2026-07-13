@@ -1,16 +1,88 @@
+from flask import Flask, render_template, request
+from werkzeug.utils import secure_filename
 import json
+import threading
 from pathlib import Path
-CONFIG_PATH = Path(__file__).parent / "config" / "config.json"
 
-def load_config():
+from src.features import lines_to_features
+from src.train import train_from_csv
+
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+
+SUSPICIOUS_KEYWORDS = ["attack", "suspicious", "failed password"]
+#Add the background training helper
+
+TRAINING_STATUS = {"running": False, "message": ""}
+
+def _run_training_thread(features_csv: str):
     try:
-        return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {"keywords": ["attack","suspicious","failed password"], "use_regex": False}
-    
-cfg = load_config()
-SUSPICIOUS_KEYWORDS = cfg.get("keywords", [])
-USE_REGEX = cfg.get("use_regex", False)
+        TRAINING_STATUS["running"] = True
+        TRAINING_STATUS["message"] = "training..."
+        train_from_csv(features_csv)
+        TRAINING_STATUS["message"] = "training completed"
+    except Exception as e:
+        TRAINING_STATUS["message"] = f"training error: {e}"
+    finally:
+        TRAINING_STATUS["running"] = False
+
+#add a complete index route (GET + POST) and status endpoint
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        uploaded_file = request.files.get("log_file")
+        if uploaded_file and uploaded_file.filename != "":
+            raw_dir = Path("data") / "raw"
+            raw_dir.mkdir(parents=True, exist_ok=True)
+            filename = secure_filename(uploaded_file.filename)
+            saved_path = raw_dir / filename
+            uploaded_file.save(str(saved_path))
+
+            text = saved_path.read_text(encoding="utf-8", errors="ignore")
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+            processed_dir = Path("data") / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            features_csv = processed_dir / "features.csv"
+            lines_to_features(lines, out_csv=str(features_csv))
+
+            if not TRAINING_STATUS["running"]:
+                t = threading.Thread(
+                    target=_run_training_thread,
+                    args=(str(features_csv),),
+                    daemon=True,
+                )
+                t.start()
+                TRAINING_STATUS["message"] = "training started"
+            else:
+                TRAINING_STATUS["message"] = "training already running"
+
+            results = []
+            for line in lines:
+                suspicious = any(keyword in line.lower() for keyword in SUSPICIOUS_KEYWORDS)
+                results.append({"line": line, "suspicious": suspicious})
+
+            suspicious_count = sum(1 for item in results if item["suspicious"])
+
+            return render_template(
+                "index.html",
+                suspicious_count=suspicious_count,
+                results=results,
+                train_status=TRAINING_STATUS,
+            )
+
+    # GET request: just show the form with no results
+    return render_template(
+        "index.html",
+        suspicious_count=0,
+        results=[],
+        train_status=TRAINING_STATUS,
+    )
 
 
-    
+@app.route("/train_status")
+def train_status():
+    return TRAINING_STATUS
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5001, debug=True)
