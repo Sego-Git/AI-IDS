@@ -1,0 +1,90 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f7fb;
+        color: #1f2937;
+        margin: 0;
+        padding: 0;
+    }
+
+    .container {
+        max-width: 800px;
+        margin: 40px auto;
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+        color: #0f172a;
+    }
+
+    form {
+        margin-bottom: 20px;
+    }
+
+    input[type="file"] {
+        margin-right: 10px;
+    }
+
+    button {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #1d4ed8;
+    }
+
+    .result {
+        margin-bottom: 8px;
+        padding: 8px;
+        border-radius: 6px;
+    }
+
+    .safe {
+        background-color: #dcfce7;
+        color: #166534;
+    }
+
+    .danger {
+        background-color: #fee2e2;
+        color: #b91c1c;
+    }
+</style>
+
+
+
+
+    <title>AI-IDS Dashboard</title>
+</head>
+<body>
+    <div class="container">
+        <h1>AI-IDS Dashboard</h1>
+
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="log_file">
+            <button type="submit">Analyze</button>
+        </form>
+
+        <p>Suspicious events: {{ suspicious_count }}</p>
+
+        <ul>
+            {% for item in results %}
+                <li class="result {% if item.suspicious %}danger{% else %}safe{% endif %}">
+                    {{ item.line }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
